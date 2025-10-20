@@ -48,3 +48,5 @@ ios/Runner/GoogleService-Info.plist
 
 # GitHub workflows
 .github/
+lib/firebase_options.dart
+firebase.json
