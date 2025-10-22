@@ -160,8 +160,8 @@ class _ConnectionScreenState extends State<ConnectionScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppConstants.purpleGradient,
+        decoration: BoxDecoration(
+          gradient: AppConstants.darkGradient,
         ),
         child: Stack(
           children: [
@@ -251,18 +251,18 @@ class _ConnectionScreenState extends State<ConnectionScreen>
                                             ]
                                           : _isWaiting
                                               ? [
-                                                  AppConstants.accentRose,
-                                                  AppConstants.heartRed,
+                                                  AppConstants.accentBlue,
+                                                  AppConstants.accentTeal,
                                                 ]
                                               : [
-                                                  Colors.white,
-                                                  AppConstants.primaryPink,
+                                                  AppConstants.cardDark,
+                                                  AppConstants.accentBlue,
                                                 ],
                                     ),
                                     boxShadow: [
                                       BoxShadow(
                                         color: _isWaiting
-                                            ? AppConstants.heartRed
+                                            ? AppConstants.accentBlue
                                                 .withOpacity(0.6)
                                             : Colors.white.withOpacity(0.5),
                                         blurRadius: 30,

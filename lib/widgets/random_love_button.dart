@@ -83,12 +83,12 @@ class _RandomLoveButtonState extends State<RandomLoveButton>
 
   Color _getRandomButtonColor() {
     final colors = [
-      AppConstants.primaryPink,
-      AppConstants.secondaryPurple,
-      AppConstants.accentRose,
-      const Color(0xFFFFB6C1), // Light Pink
-      const Color(0xFFF8BBD9), // Soft Pink
-      const Color(0xFFE6E6FA), // Lavender
+      AppConstants.accentBlue,
+      AppConstants.accentTeal,
+      AppConstants.sentMessageBg,
+      const Color(0xFF58A6FF), // Light Blue
+      const Color(0xFF39C5CF), // Teal
+      const Color(0xFF1F6FEB), // Dark Blue
     ];
     return colors[_random.nextInt(colors.length)];
   }

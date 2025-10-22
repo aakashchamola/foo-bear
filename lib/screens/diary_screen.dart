@@ -144,8 +144,8 @@ class _DiaryScreenState extends State<DiaryScreen>
           });
         }
       },
-      selectedColor: AppConstants.primaryPink.withOpacity(0.3),
-      backgroundColor: Colors.grey[200],
+      selectedColor: AppConstants.accentBlue.withOpacity(0.3),
+      backgroundColor: AppConstants.cardDark,
     );
   }
 
@@ -212,26 +212,22 @@ class _DiaryScreenState extends State<DiaryScreen>
           'Our Diary 📖',
           style: TextStyle(fontFamily: 'Pacifico', fontSize: 24),
         ),
-        backgroundColor: AppConstants.primaryPink,
+        backgroundColor: AppConstants.secondaryDark,
+        foregroundColor: AppConstants.textLight,
         elevation: 0,
+        iconTheme: const IconThemeData(color: AppConstants.textLight),
       ),
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppConstants.primaryPink.withOpacity(0.1),
-              AppConstants.secondaryPurple.withOpacity(0.1),
-            ],
-          ),
+          gradient: AppConstants.darkGradient,
         ),
         child: FutureBuilder<String?>(
           future: UserService.getUserDocId(),
           builder: (context, userSnapshot) {
             if (!userSnapshot.hasData) {
               return const Center(
-                child: CircularProgressIndicator(color: AppConstants.heartRed),
+                child:
+                    CircularProgressIndicator(color: AppConstants.accentBlue),
               );
             }
 
@@ -243,8 +239,8 @@ class _DiaryScreenState extends State<DiaryScreen>
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child:
-                        CircularProgressIndicator(color: AppConstants.heartRed),
+                    child: CircularProgressIndicator(
+                        color: AppConstants.accentBlue),
                   );
                 }
 
@@ -256,15 +252,15 @@ class _DiaryScreenState extends State<DiaryScreen>
                         Icon(
                           Icons.book_outlined,
                           size: 80,
-                          color: AppConstants.textDark.withOpacity(0.3),
+                          color: AppConstants.textMuted,
                         ),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'No memories yet\nStart writing your story together! 💕',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 18,
-                            color: AppConstants.textDark,
+                            color: AppConstants.textMuted,
                           ),
                         ),
                       ],
@@ -301,11 +297,10 @@ class _DiaryScreenState extends State<DiaryScreen>
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                Colors.white,
+                                AppConstants.cardDark,
                                 isAuthor
-                                    ? AppConstants.primaryPink.withOpacity(0.05)
-                                    : AppConstants.secondaryPurple
-                                        .withOpacity(0.05),
+                                    ? AppConstants.accentBlue.withOpacity(0.15)
+                                    : AppConstants.accentTeal.withOpacity(0.15),
                               ],
                             ),
                           ),
@@ -319,7 +314,7 @@ class _DiaryScreenState extends State<DiaryScreen>
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: AppConstants.primaryPink
+                                        color: AppConstants.accentBlue
                                             .withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
@@ -352,9 +347,8 @@ class _DiaryScreenState extends State<DiaryScreen>
                                                 ),
                                                 decoration: BoxDecoration(
                                                   color: isAuthor
-                                                      ? AppConstants.heartRed
-                                                      : AppConstants
-                                                          .secondaryPurple,
+                                                      ? AppConstants.accentBlue
+                                                      : AppConstants.accentTeal,
                                                   borderRadius:
                                                       BorderRadius.circular(12),
                                                 ),
@@ -376,8 +370,7 @@ class _DiaryScreenState extends State<DiaryScreen>
                                                     style: TextStyle(
                                                       fontSize: 11,
                                                       color: AppConstants
-                                                          .textDark
-                                                          .withOpacity(0.6),
+                                                          .textMuted,
                                                     ),
                                                     overflow:
                                                         TextOverflow.ellipsis,
@@ -415,7 +408,7 @@ class _DiaryScreenState extends State<DiaryScreen>
         scale: _fabAnimation,
         child: FloatingActionButton.extended(
           onPressed: _showAddEntryDialog,
-          backgroundColor: AppConstants.heartRed,
+          backgroundColor: AppConstants.accentBlue,
           icon: const Icon(Icons.add),
           label: const Text('Write'),
         ),

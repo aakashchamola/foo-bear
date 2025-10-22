@@ -181,7 +181,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             role == 'male' ? '💙 Welcome, King!' : '💖 Welcome, Queen!',
           ),
           backgroundColor:
-              role == 'male' ? Colors.blue : AppConstants.accentRose,
+              role == 'male' ? Colors.blue : AppConstants.accentTeal,
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
           shape:
@@ -317,18 +317,18 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 end: Alignment.bottomRight,
                 colors: [
                   Color.lerp(
-                    AppConstants.primaryPink,
-                    AppConstants.secondaryPurple,
+                    AppConstants.secondaryDark,
+                    AppConstants.cardDark,
                     _gradientAnimation.value * 0.3,
                   )!,
                   Color.lerp(
-                    AppConstants.accentRose,
-                    AppConstants.primaryPink,
+                    AppConstants.accentBlue,
+                    AppConstants.accentTeal,
                     _gradientAnimation.value * 0.5,
                   )!,
                   Color.lerp(
-                    AppConstants.backgroundCream,
-                    AppConstants.accentRose,
+                    AppConstants.primaryDark,
+                    AppConstants.accentBlue,
                     _gradientAnimation.value * 0.2,
                   )!,
                 ],
@@ -356,14 +356,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  AppConstants.accentRose.withOpacity(0.8),
-                                  AppConstants.secondaryPurple.withOpacity(0.6),
+                                  AppConstants.accentBlue.withOpacity(0.8),
+                                  AppConstants.accentTeal.withOpacity(0.6),
                                 ],
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppConstants.secondaryPurple
-                                      .withOpacity(0.3),
+                                  color:
+                                      AppConstants.accentBlue.withOpacity(0.3),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -393,7 +393,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                         'Welcome to',
                                         style: const TextStyle(
                                           fontSize: 24,
-                                          color: AppConstants.textDark,
+                                          color: AppConstants.textLight,
                                           fontWeight: FontWeight.w300,
                                         ),
                                         textAlign: TextAlign.center,
@@ -402,7 +402,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                       Text(
                                         'Our Private World',
                                         style: const TextStyle(
-                                          color: AppConstants.textDark,
+                                          color: AppConstants.textLight,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 42,
                                         ),
@@ -415,7 +415,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                         children: [
                                           Icon(
                                             Icons.favorite,
-                                            color: AppConstants.accentRose,
+                                            color: AppConstants.heartRed,
                                             size: 24,
                                           ),
                                           const SizedBox(width: 8),
@@ -427,7 +427,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                           const SizedBox(width: 8),
                                           Icon(
                                             Icons.favorite,
-                                            color: AppConstants.accentRose,
+                                            color: AppConstants.heartRed,
                                             size: 24,
                                           ),
                                         ],
@@ -451,7 +451,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   'I am...',
                                   style: TextStyle(
                                     fontSize: 18,
-                                    color: AppConstants.textDark,
+                                    color: AppConstants.textLight,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -492,8 +492,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                         label: 'Her',
                                         gradient: LinearGradient(
                                           colors: [
-                                            AppConstants.primaryPink,
-                                            AppConstants.accentRose,
+                                            AppConstants.accentTeal,
+                                            AppConstants.accentBlue,
                                           ],
                                         ),
                                       ),
@@ -554,11 +554,11 @@ class AnimatedHeart {
     rotationSpeed = (random.nextDouble() - 0.5) * 4;
 
     final colors = [
-      AppConstants.accentRose,
-      AppConstants.primaryPink,
-      AppConstants.secondaryPurple,
-      Colors.pink.shade200,
-      Colors.red.shade200,
+      AppConstants.accentBlue,
+      AppConstants.accentTeal,
+      AppConstants.sentMessageBg,
+      Colors.blue.shade400,
+      Colors.teal.shade400,
     ];
     color = colors[random.nextInt(colors.length)]
         .withOpacity(0.6 + random.nextDouble() * 0.4);

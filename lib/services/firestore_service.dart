@@ -208,6 +208,19 @@ class FirestoreService {
     });
   }
 
+  // Get partner's typing status as a stream
+  static Stream<bool> getPartnerTypingStatus(String partnerId) {
+    return _firestore
+        .collection(AppConstants.usersCollection)
+        .doc(partnerId)
+        .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) return false;
+      final data = snapshot.data() as Map<String, dynamic>?;
+      return data?['isTyping'] ?? false;
+    });
+  }
+
   // Mark all messages from partner as read
   static Future<void> markAllMessagesAsRead(
       String userId, String partnerId) async {

@@ -13,33 +13,41 @@ class AppConstants {
   static const String notificationsCollection = 'notifications';
   static const String connectionsCollection = 'connections';
 
-  // Colors - Romantic Theme
-  static const Color primaryPink = Color(0xFFFFB6C1); // Light Pink
-  static const Color secondaryPurple = Color(0xFFDDA0DD); // Plum
-  static const Color accentRose = Color(0xFFFF69B4); // Hot Pink
-  static const Color backgroundCream = Color(0xFFFFFAF0); // Floral White
-  static const Color textDark = Color(0xFF4A4A4A);
-  static const Color heartRed = Color(0xFFFF1744);
-  static const Color shadowColor = Color(0x1A000000);
+  // Colors - Dark Blue/Black Theme
+  static const Color primaryDark = Color(0xFF0D1117); // Dark background
+  static const Color secondaryDark = Color(0xFF1C2128); // Slightly lighter dark
+  static const Color accentBlue = Color(0xFF58A6FF); // Bright blue accent
+  static const Color accentTeal = Color(0xFF39C5CF); // Teal accent
+  static const Color backgroundDark = Color(0xFF161B22); // Dark grey background
+  static const Color textLight = Color(0xFFC9D1D9); // Light grey text
+  static const Color textMuted = Color(0xFF8B949E); // Muted grey text
+  static const Color heartRed = Color(0xFFFF6B9D); // Softer red/pink
+  static const Color shadowColor = Color(0x40000000);
+  static const Color cardDark = Color(0xFF21262D); // Card background
+
+  // Message bubble colors
+  static const Color sentMessageBg = Color(0xFF0969DA); // Blue for sent
+  static const Color receivedMessageBg =
+      Color(0xFF21262D); // Dark grey for received
+  static const Color borderGrey = Color(0xFF30363D); // Border color
 
   // Gradient Colors
-  static const LinearGradient pinkGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFFFFE4E6),
-      Color(0xFFFFB6C1),
-      Color(0xFFFFC0CB),
-    ],
-  );
-
-  static const LinearGradient purpleGradient = LinearGradient(
+  static const LinearGradient darkGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFFE6E6FA),
-      Color(0xFFDDA0DD),
-      Color(0xFFDA70D6),
+      Color(0xFF0D1117),
+      Color(0xFF161B22),
+      Color(0xFF1C2128),
+    ],
+  );
+
+  static const LinearGradient blueGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF0969DA),
+      Color(0xFF1F6FEB),
     ],
   );
 
@@ -125,27 +133,30 @@ class AppConstants {
 }
 
 class AppThemes {
-  static ThemeData get romanticTheme {
+  static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.dark,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppConstants.primaryPink,
-        brightness: Brightness.light,
+        seedColor: AppConstants.accentBlue,
+        brightness: Brightness.dark,
+        background: AppConstants.primaryDark,
+        surface: AppConstants.secondaryDark,
       ),
-      scaffoldBackgroundColor: AppConstants.backgroundCream,
+      scaffoldBackgroundColor: AppConstants.primaryDark,
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppConstants.secondaryDark,
         elevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
-          color: AppConstants.textDark,
+          color: AppConstants.textLight,
           fontSize: 24,
           fontWeight: FontWeight.w600,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppConstants.primaryPink,
+          backgroundColor: AppConstants.accentBlue,
           foregroundColor: Colors.white,
           elevation: 4,
           shadowColor: AppConstants.shadowColor,
@@ -159,8 +170,8 @@ class AppThemes {
         ),
       ),
       cardTheme: CardTheme(
-        color: Colors.white.withOpacity(0.9),
-        elevation: 8,
+        color: AppConstants.cardDark,
+        elevation: 4,
         shadowColor: AppConstants.shadowColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadius),

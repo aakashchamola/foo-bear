@@ -8,7 +8,6 @@ import 'services/auth_service.dart';
 import 'services/firestore_service.dart';
 import 'screens/camouflage/fake_todo_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/chat_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +43,6 @@ class UsTimeApp extends StatelessWidget {
       home: const AppWrapper(),
       routes: {
         '/home': (context) => const HomeScreen(),
-        '/chat': (context) => const ChatScreen(),
       },
     );
   }

@@ -129,19 +129,14 @@ class _GalleryScreenState extends State<GalleryScreen>
           'Our Gallery 📸',
           style: TextStyle(fontFamily: 'Pacifico', fontSize: 24),
         ),
-        backgroundColor: AppConstants.primaryPink,
+        backgroundColor: AppConstants.secondaryDark,
+        foregroundColor: AppConstants.textLight,
         elevation: 0,
+        iconTheme: const IconThemeData(color: AppConstants.textLight),
       ),
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppConstants.primaryPink.withOpacity(0.1),
-              AppConstants.secondaryPurple.withOpacity(0.1),
-            ],
-          ),
+          gradient: AppConstants.darkGradient,
         ),
         child: FutureBuilder<String?>(
           future: UserService.getUserDocId(),
@@ -173,7 +168,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                         Icon(
                           Icons.photo_library_outlined,
                           size: 80,
-                          color: AppConstants.textDark.withOpacity(0.3),
+                          color: AppConstants.textMuted,
                         ),
                         const SizedBox(height: 16),
                         const Text(
@@ -181,7 +176,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 18,
-                            color: AppConstants.textDark,
+                            color: AppConstants.textLight,
                           ),
                         ),
                       ],
@@ -241,11 +236,10 @@ class _GalleryScreenState extends State<GalleryScreen>
                                       (context, child, loadingProgress) {
                                     if (loadingProgress == null) return child;
                                     return Container(
-                                      color: AppConstants.primaryPink
-                                          .withOpacity(0.1),
+                                      color: AppConstants.cardDark,
                                       child: const Center(
                                         child: CircularProgressIndicator(
-                                          color: AppConstants.heartRed,
+                                          color: AppConstants.accentBlue,
                                         ),
                                       ),
                                     );
@@ -311,12 +305,12 @@ class _GalleryScreenState extends State<GalleryScreen>
         ),
       ),
       floatingActionButton: _isUploading
-          ? const CircularProgressIndicator(color: AppConstants.heartRed)
+          ? const CircularProgressIndicator(color: AppConstants.accentBlue)
           : ScaleTransition(
               scale: _fabAnimation,
               child: FloatingActionButton.extended(
                 onPressed: _pickAndUploadImage,
-                backgroundColor: AppConstants.heartRed,
+                backgroundColor: AppConstants.accentBlue,
                 icon: const Icon(Icons.add_a_photo),
                 label: const Text('Add Photo'),
               ),
@@ -373,7 +367,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                             : 'Uploaded by Partner',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppConstants.textDark.withOpacity(0.6),
+                          color: AppConstants.textMuted,
                         ),
                       ),
                       if (timestamp != null)
@@ -381,7 +375,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                           _formatDate(timestamp.toDate()),
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppConstants.textDark.withOpacity(0.6),
+                            color: AppConstants.textMuted,
                           ),
                         ),
                     ],

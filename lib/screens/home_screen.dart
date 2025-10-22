@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/constants.dart';
 import '../widgets/floating_hearts.dart';
 import '../widgets/random_love_button.dart';
@@ -196,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: const Text('Connect with your partner first! 💑'),
-                    backgroundColor: AppConstants.accentRose,
+                    backgroundColor: AppConstants.accentBlue,
                     duration: const Duration(seconds: 2),
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
@@ -229,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: AppConstants.pinkGradient,
+          gradient: AppConstants.darkGradient,
         ),
         child: Stack(
           children: [
@@ -355,14 +356,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                            AppConstants.primaryPink),
+                            AppConstants.accentBlue),
                       ),
                     )
                   : Icon(
                       _isConnected ? Icons.favorite : Icons.link,
                       color: _isConnected
                           ? AppConstants.heartRed
-                          : AppConstants.primaryPink,
+                          : AppConstants.accentBlue,
                       size: 28,
                     ),
             ),
@@ -380,29 +381,161 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildNavButton(Icons.chat, 'Chat', _isConnected, () async {
-            if (_isConnected) {
-              final userDocId = await UserService.getUserDocId();
-              if (userDocId != null) {
-                final userDoc =
-                    await FirestoreService.getUserProfile(userDocId);
-                if (userDoc.exists) {
-                  final userData = userDoc.data() as Map<String, dynamic>?;
-                  final partnerId = userData?['partnerId'] as String?;
-                  if (partnerId != null && mounted) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            EnhancedChatScreen(partnerId: partnerId),
-                      ),
-                    );
+          // Chat button with unread count badge
+          FutureBuilder<String?>(
+            future: UserService.getUserDocId(),
+            builder: (context, userSnapshot) {
+              if (!userSnapshot.hasData || !_isConnected) {
+                // No user or not connected - show regular button without badge
+                return _buildNavButton(Icons.chat, 'Chat', _isConnected,
+                    () async {
+                  if (_isConnected) {
+                    final userDocId = await UserService.getUserDocId();
+                    if (userDocId != null) {
+                      final userDoc =
+                          await FirestoreService.getUserProfile(userDocId);
+                      if (userDoc.exists) {
+                        final userData =
+                            userDoc.data() as Map<String, dynamic>?;
+                        final partnerId = userData?['partnerId'] as String?;
+                        if (partnerId != null && mounted) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  EnhancedChatScreen(partnerId: partnerId),
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  } else {
+                    _showLockedFeatureMessage();
                   }
-                }
+                });
               }
-            } else {
-              _showLockedFeatureMessage();
-            }
-          }),
+
+              final userDocId = userSnapshot.data!;
+
+              return FutureBuilder<DocumentSnapshot>(
+                future: FirestoreService.getUserProfile(userDocId),
+                builder: (context, profileSnapshot) {
+                  if (!profileSnapshot.hasData) {
+                    return _buildNavButton(Icons.chat, 'Chat', _isConnected,
+                        () async {
+                      if (_isConnected) {
+                        final userDocId = await UserService.getUserDocId();
+                        if (userDocId != null) {
+                          final userDoc =
+                              await FirestoreService.getUserProfile(userDocId);
+                          if (userDoc.exists) {
+                            final userData =
+                                userDoc.data() as Map<String, dynamic>?;
+                            final partnerId = userData?['partnerId'] as String?;
+                            if (partnerId != null && mounted) {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      EnhancedChatScreen(partnerId: partnerId),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      } else {
+                        _showLockedFeatureMessage();
+                      }
+                    });
+                  }
+
+                  final userData =
+                      profileSnapshot.data!.data() as Map<String, dynamic>?;
+                  final partnerId = userData?['partnerId'] as String?;
+
+                  if (partnerId == null) {
+                    return _buildNavButton(Icons.chat, 'Chat', _isConnected,
+                        () async {
+                      if (_isConnected) {
+                        final userDocId = await UserService.getUserDocId();
+                        if (userDocId != null) {
+                          final userDoc =
+                              await FirestoreService.getUserProfile(userDocId);
+                          if (userDoc.exists) {
+                            final userData =
+                                userDoc.data() as Map<String, dynamic>?;
+                            final partnerId = userData?['partnerId'] as String?;
+                            if (partnerId != null && mounted) {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      EnhancedChatScreen(partnerId: partnerId),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      } else {
+                        _showLockedFeatureMessage();
+                      }
+                    });
+                  }
+
+                  // Connected - show button with unread count stream
+                  return StreamBuilder<int>(
+                    stream: FirestoreService.getUnreadMessageCount(
+                        userDocId, partnerId),
+                    builder: (context, unreadSnapshot) {
+                      final unreadCount = unreadSnapshot.data ?? 0;
+
+                      // Also listen to typing status
+                      return StreamBuilder<bool>(
+                        stream:
+                            FirestoreService.getPartnerTypingStatus(partnerId),
+                        builder: (context, typingSnapshot) {
+                          final isPartnerTyping = typingSnapshot.data ?? false;
+
+                          return _buildNavButton(
+                            Icons.chat,
+                            'Chat',
+                            _isConnected,
+                            () async {
+                              if (_isConnected) {
+                                final userDocId =
+                                    await UserService.getUserDocId();
+                                if (userDocId != null) {
+                                  final userDoc =
+                                      await FirestoreService.getUserProfile(
+                                          userDocId);
+                                  if (userDoc.exists) {
+                                    final userData =
+                                        userDoc.data() as Map<String, dynamic>?;
+                                    final partnerId =
+                                        userData?['partnerId'] as String?;
+                                    if (partnerId != null && mounted) {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              EnhancedChatScreen(
+                                                  partnerId: partnerId),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              } else {
+                                _showLockedFeatureMessage();
+                              }
+                            },
+                            badgeCount: unreadCount,
+                            isTyping: isPartnerTyping,
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
           _buildNavButton(Icons.photo_library, 'Gallery', _isConnected,
               () async {
             if (_isConnected) {
@@ -464,7 +597,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       SnackBar(
         content: const Text(
             '🔒 Connect with your partner first to unlock this feature!'),
-        backgroundColor: AppConstants.accentRose,
+        backgroundColor: AppConstants.accentBlue,
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -484,7 +617,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildNavButton(
-      IconData icon, String label, bool isUnlocked, VoidCallback onPressed) {
+      IconData icon, String label, bool isUnlocked, VoidCallback onPressed,
+      {int? badgeCount, bool isTyping = false}) {
     return GestureDetector(
       onTap: onPressed,
       child: Opacity(
@@ -506,17 +640,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ],
           ),
           child: Stack(
+            clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, color: AppConstants.primaryPink, size: 24),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(icon, color: AppConstants.accentBlue, size: 24),
+                      // Typing indicator dots on icon
+                      if (isTyping)
+                        Positioned(
+                          bottom: 4,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildMiniTypingDot(0),
+                              const SizedBox(width: 2),
+                              _buildMiniTypingDot(1),
+                              const SizedBox(width: 2),
+                              _buildMiniTypingDot(2),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     label,
                     style: const TextStyle(
-                      color: AppConstants.textDark,
+                      color: AppConstants.textLight,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -530,13 +685,77 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Icon(
                     Icons.lock,
                     size: 14,
-                    color: AppConstants.textDark.withOpacity(0.6),
+                    color: AppConstants.textMuted,
+                  ),
+                ),
+              if (badgeCount != null && badgeCount > 0)
+                Positioned(
+                  top: -8,
+                  right: -8,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppConstants.heartRed,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppConstants.heartRed.withOpacity(0.5),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
+                    ),
+                    child: Center(
+                      child: Text(
+                        badgeCount > 99 ? '99+' : badgeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMiniTypingDot(int index) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      builder: (context, value, child) {
+        final delay = index * 0.2;
+        final animValue = ((value + delay) % 1.0);
+        final scale = (animValue < 0.5)
+            ? 1.0 + (animValue * 0.5)
+            : 1.0 + ((1.0 - animValue) * 0.5);
+
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: AppConstants.heartRed,
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      },
+      onEnd: () {
+        if (mounted) {
+          setState(() {}); // Restart animation
+        }
+      },
     );
   }
 }

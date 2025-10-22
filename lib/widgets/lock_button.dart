@@ -18,8 +18,8 @@ class LockButton extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppConstants.backgroundCream,
-                AppConstants.primaryPink.withOpacity(0.2),
+                AppConstants.cardDark,
+                AppConstants.accentBlue.withOpacity(0.2),
               ],
             ),
             borderRadius: BorderRadius.circular(16),
@@ -30,7 +30,7 @@ class LockButton extends StatelessWidget {
               Icon(
                 Icons.lock_outline,
                 size: 60,
-                color: AppConstants.accentRose,
+                color: AppConstants.accentBlue,
               ),
               const SizedBox(height: 16),
               const Text(
@@ -38,7 +38,7 @@ class LockButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: AppConstants.textDark,
+                  color: AppConstants.textLight,
                 ),
               ),
               const SizedBox(height: 12),
@@ -47,7 +47,7 @@ class LockButton extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
-                  color: AppConstants.textDark.withOpacity(0.7),
+                  color: AppConstants.textMuted,
                 ),
               ),
               const SizedBox(height: 24),
@@ -79,7 +79,7 @@ class LockButton extends StatelessWidget {
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppConstants.accentRose,
+                        backgroundColor: AppConstants.accentBlue,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -106,38 +106,34 @@ class LockButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: 16,
-      right: 16,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppConstants.accentRose,
-                AppConstants.heartRed,
-              ],
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppConstants.heartRed.withOpacity(0.4),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppConstants.accentBlue,
+              AppConstants.accentTeal,
             ],
           ),
-          child: InkWell(
-            onTap: () => _lockApp(context),
-            customBorder: const CircleBorder(),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              child: const Icon(
-                Icons.lock_outline,
-                color: Colors.white,
-                size: 24,
-              ),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppConstants.accentBlue.withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: InkWell(
+          onTap: () => _lockApp(context),
+          customBorder: const CircleBorder(),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            child: const Icon(
+              Icons.lock_outline,
+              color: Colors.white,
+              size: 24,
             ),
           ),
         ),
