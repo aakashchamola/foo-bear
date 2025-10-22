@@ -6,7 +6,10 @@ import '../widgets/random_love_button.dart';
 import '../widgets/lock_button.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
-import 'chat_screen.dart';
+import '../services/user_service.dart';
+import 'enhanced_chat_screen.dart';
+import 'gallery_screen.dart';
+import 'diary_screen.dart';
 import 'connection_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AnimationController _backgroundController;
   final List<Widget> _loveButtons = [];
   final Random _random = Random();
+  bool _isConnected = false;
+  bool _isLoadingConnection = true;
 
   @override
   void initState() {
@@ -34,6 +39,53 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       duration: const Duration(seconds: 20),
       vsync: this,
     )..repeat();
+
+    _checkConnectionStatus();
+    _listenToConnectionChanges();
+  }
+
+  void _listenToConnectionChanges() {
+    final currentUser = AuthService.currentUser;
+    if (currentUser != null) {
+      // Listen to user profile changes to detect when partnerId is set
+      FirestoreService.getUserProfile(currentUser.uid).then((userDoc) {
+        if (userDoc.exists && mounted) {
+          // Set up a real-time listener
+          FirestoreService.getUserProfileStream(currentUser.uid)
+              .listen((snapshot) {
+            if (snapshot.exists && mounted) {
+              final userData = snapshot.data() as Map<String, dynamic>?;
+              final partnerId = userData?['partnerId'] as String?;
+              final isConnected = partnerId != null && partnerId.isNotEmpty;
+
+              if (isConnected != _isConnected) {
+                setState(() {
+                  _isConnected = isConnected;
+                });
+
+                // Regenerate buttons with new opacity
+                _generateRandomButtons();
+
+                // Show a celebration message when newly connected
+                if (isConnected && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text(
+                          '🎉 You are now connected! All features unlocked!'),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 3),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                }
+              }
+            }
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -49,6 +101,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  Future<void> _checkConnectionStatus() async {
+    final currentUser = AuthService.currentUser;
+    if (currentUser != null) {
+      // Get the user's actual Firestore document ID
+      final userDocId = await UserService.getUserDocId();
+      if (userDocId != null) {
+        final isConnected = await FirestoreService.isUserConnected(userDocId);
+        if (mounted) {
+          setState(() {
+            _isConnected = isConnected;
+            _isLoadingConnection = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoadingConnection = false;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoadingConnection = false;
+      });
+    }
+  }
+
   void _generateRandomButtons() {
     _loveButtons.clear();
     final screenSize = MediaQuery.of(context).size;
@@ -61,9 +138,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         top: 200 + _random.nextDouble() * (screenSize.height - 400),
         child: Transform.rotate(
           angle: (_random.nextDouble() - 0.5) * 0.4,
-          child: RandomLoveButton(
-            message: message,
-            onPressed: () => _onLoveButtonPressed(message),
+          child: Opacity(
+            opacity: _isConnected ? 1.0 : 0.3,
+            child: RandomLoveButton(
+              message: message,
+              onPressed: () => _isConnected
+                  ? _onLoveButtonPressed(message)
+                  : _showLockedFeatureMessage(),
+            ),
           ),
         ),
       );
@@ -80,44 +162,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       final currentUser = AuthService.currentUser;
       if (currentUser != null) {
-        // Get user profile to find partner
-        final userDoc = await FirestoreService.getUserProfile(currentUser.uid);
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>?;
-          final partnerId = userData?['partnerId'] as String?;
+        // Get the user's actual Firestore document ID
+        final userDocId = await UserService.getUserDocId();
+        if (userDocId != null) {
+          // Get user profile to find partner
+          final userDoc = await FirestoreService.getUserProfile(userDocId);
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>?;
+            final partnerId = userData?['partnerId'] as String?;
 
-          if (partnerId != null && partnerId.isNotEmpty) {
-            // Send love notification to partner
-            await FirestoreService.sendLoveNotification(
-              senderId: currentUser.uid,
-              receiverId: partnerId,
-              message: message,
-            );
+            if (partnerId != null && partnerId.isNotEmpty) {
+              // Send love notification to partner
+              await FirestoreService.sendLoveNotification(
+                senderId: userDocId,
+                receiverId: partnerId,
+                message: message,
+              );
 
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('💕 Sent "$message" to your love!'),
-                  backgroundColor: AppConstants.heartRed,
-                  duration: const Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              );
-            }
-          } else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Connect with your partner first! 💑'),
-                  backgroundColor: AppConstants.accentRose,
-                  duration: const Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('💕 Sent "$message" to your love!'),
+                    backgroundColor: AppConstants.heartRed,
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              }
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Connect with your partner first! 💑'),
+                    backgroundColor: AppConstants.accentRose,
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              }
             }
           }
         }
@@ -197,14 +283,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Connection button
+          // Connection/Love button
           GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const ConnectionScreen(),
-                ),
-              );
+            onTap: () async {
+              if (_isConnected) {
+                // Already connected - show who they're connected to or do nothing
+                final currentUser = AuthService.currentUser;
+                if (currentUser != null) {
+                  final userDocId = await UserService.getUserDocId();
+                  if (userDocId != null) {
+                    final userDoc =
+                        await FirestoreService.getUserProfile(userDocId);
+                    if (userDoc.exists) {
+                      final userData = userDoc.data() as Map<String, dynamic>?;
+                      final partnerId = userData?['partnerId'] as String?;
+
+                      if (partnerId != null && mounted) {
+                        final partnerDoc =
+                            await FirestoreService.getUserProfile(partnerId);
+                        final partnerData =
+                            partnerDoc.data() as Map<String, dynamic>?;
+                        final partnerName = partnerData?['name'] ??
+                            partnerData?['nickname'] ??
+                            'your love';
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('💕 Connected with $partnerName'),
+                            backgroundColor: AppConstants.heartRed,
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      }
+                    }
+                  }
+                }
+              } else {
+                // Not connected - navigate to connection screen
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ConnectionScreen(),
+                  ),
+                );
+
+                // Refresh connection status when returning
+                if (result == true) {
+                  _checkConnectionStatus();
+                }
+              }
             },
             child: Container(
               padding: const EdgeInsets.all(12),
@@ -219,11 +348,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.favorite,
-                color: AppConstants.primaryPink,
-                size: 28,
-              ),
+              child: _isLoadingConnection
+                  ? const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            AppConstants.primaryPink),
+                      ),
+                    )
+                  : Icon(
+                      _isConnected ? Icons.favorite : Icons.link,
+                      color: _isConnected
+                          ? AppConstants.heartRed
+                          : AppConstants.primaryPink,
+                      size: 28,
+                    ),
             ),
           ),
           // lock button
@@ -239,52 +380,161 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildNavButton(Icons.chat, 'Chat', () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const ChatScreen()),
-            );
+          _buildNavButton(Icons.chat, 'Chat', _isConnected, () async {
+            if (_isConnected) {
+              final userDocId = await UserService.getUserDocId();
+              if (userDocId != null) {
+                final userDoc =
+                    await FirestoreService.getUserProfile(userDocId);
+                if (userDoc.exists) {
+                  final userData = userDoc.data() as Map<String, dynamic>?;
+                  final partnerId = userData?['partnerId'] as String?;
+                  if (partnerId != null && mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            EnhancedChatScreen(partnerId: partnerId),
+                      ),
+                    );
+                  }
+                }
+              }
+            } else {
+              _showLockedFeatureMessage();
+            }
           }),
-          _buildNavButton(Icons.photo_library, 'Gallery', () {}),
-          _buildNavButton(Icons.lock, 'Secret', () {}),
-          _buildNavButton(Icons.book, 'Diary', () {}),
+          _buildNavButton(Icons.photo_library, 'Gallery', _isConnected,
+              () async {
+            if (_isConnected) {
+              final userDocId = await UserService.getUserDocId();
+              if (userDocId != null) {
+                final userDoc =
+                    await FirestoreService.getUserProfile(userDocId);
+                if (userDoc.exists) {
+                  final userData = userDoc.data() as Map<String, dynamic>?;
+                  final partnerId = userData?['partnerId'] as String?;
+                  if (partnerId != null && mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            GalleryScreen(partnerId: partnerId),
+                      ),
+                    );
+                  }
+                }
+              }
+            } else {
+              _showLockedFeatureMessage();
+            }
+          }),
+          _buildNavButton(Icons.lock, 'Secret', _isConnected, () {
+            if (!_isConnected) {
+              _showLockedFeatureMessage();
+            }
+          }),
+          _buildNavButton(Icons.book, 'Diary', _isConnected, () async {
+            if (_isConnected) {
+              final userDocId = await UserService.getUserDocId();
+              if (userDocId != null) {
+                final userDoc =
+                    await FirestoreService.getUserProfile(userDocId);
+                if (userDoc.exists) {
+                  final userData = userDoc.data() as Map<String, dynamic>?;
+                  final partnerId = userData?['partnerId'] as String?;
+                  if (partnerId != null && mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => DiaryScreen(partnerId: partnerId),
+                      ),
+                    );
+                  }
+                }
+              }
+            } else {
+              _showLockedFeatureMessage();
+            }
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildNavButton(IconData icon, String label, VoidCallback onPressed) {
+  void _showLockedFeatureMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+            '🔒 Connect with your partner first to unlock this feature!'),
+        backgroundColor: AppConstants.accentRose,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        action: SnackBarAction(
+          label: 'Connect',
+          textColor: Colors.white,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const ConnectionScreen(),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavButton(
+      IconData icon, String label, bool isUnlocked, VoidCallback onPressed) {
     return GestureDetector(
       onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          vertical: AppConstants.smallPadding,
-          horizontal: AppConstants.defaultPadding,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-          boxShadow: const [
-            BoxShadow(
-              color: AppConstants.shadowColor,
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppConstants.primaryPink, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppConstants.textDark,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+      child: Opacity(
+        opacity: isUnlocked ? 1.0 : 0.5,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            vertical: AppConstants.smallPadding,
+            horizontal: AppConstants.defaultPadding,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+            boxShadow: const [
+              BoxShadow(
+                color: AppConstants.shadowColor,
+                blurRadius: 4,
+                offset: Offset(0, 2),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: AppConstants.primaryPink, size: 24),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppConstants.textDark,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              if (!isUnlocked)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Icon(
+                    Icons.lock,
+                    size: 14,
+                    color: AppConstants.textDark.withOpacity(0.6),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

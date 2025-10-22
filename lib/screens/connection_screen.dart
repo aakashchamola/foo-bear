@@ -1,9 +1,9 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/constants.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
-import '../widgets/lock_button.dart';
+import '../services/user_service.dart';
 
 class ConnectionScreen extends StatefulWidget {
   const ConnectionScreen({super.key});
@@ -15,126 +15,339 @@ class ConnectionScreen extends StatefulWidget {
 class _ConnectionScreenState extends State<ConnectionScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
-  late AnimationController _scaleController;
-  late AnimationController _textController;
-  late Animation<double> _pulseAnimation;
+  late AnimationController _rotateController;
+  late AnimationController _particleController;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _textOpacityAnimation;
 
-  bool _isPressed = false;
-  String? _partnerName;
-  String? _partnerId;
+  bool _isWaiting = false;
   bool _isConnected = false;
+  String _statusMessage = 'Press the magic button to connect with your love';
 
   @override
   void initState() {
     super.initState();
 
-    // Pulse animation for the button
+    // Pulse animation for the magic button
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
+    // Rotation animation
+    _rotateController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat();
+
+    // Particle animation
+    _particleController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat();
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-
-    // Scale animation for press and hold
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.easeOut),
-    );
-
-    // Text fade-in animation
-    _textController = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-
-    _textOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _textController, curve: Curves.easeIn),
-    );
-
-    _loadPartnerInfo();
-  }
-
-  Future<void> _loadPartnerInfo() async {
-    final currentUser = AuthService.currentUser;
-    if (currentUser != null) {
-      final userDoc = await FirestoreService.getUserProfile(currentUser.uid);
-      if (userDoc.exists) {
-        final userData = userDoc.data() as Map<String, dynamic>?;
-        final partnerId = userData?['partnerId'] as String?;
-
-        if (partnerId != null && partnerId.isNotEmpty) {
-          // Get partner's profile
-          final partnerDoc = await FirestoreService.getUserProfile(partnerId);
-          if (partnerDoc.exists) {
-            final partnerData = partnerDoc.data() as Map<String, dynamic>?;
-            setState(() {
-              _partnerId = partnerId;
-              _partnerName =
-                  partnerData?['displayName'] as String? ?? 'My Love';
-              _isConnected = true;
-            });
-          }
-        }
-      }
-    }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
-    _scaleController.dispose();
-    _textController.dispose();
+    _rotateController.dispose();
+    _particleController.dispose();
     super.dispose();
   }
 
-  void _onButtonPressStart() {
+  Future<void> _onMagicButtonPressed() async {
+    if (_isWaiting || _isConnected) return;
+
     setState(() {
-      _isPressed = true;
+      _isWaiting = true;
+      _statusMessage = 'Waiting for your partner to press their button...';
     });
-    _scaleController.forward();
-    _textController.forward();
+
+    try {
+      // Ensure user is authenticated (should already be, but just in case)
+      await AuthService.ensureAuthenticated();
+
+      // Get the user's actual Firestore document ID (may differ from auth UID)
+      final userDocId = await UserService.getUserDocId();
+      if (userDocId == null) {
+        throw 'User document ID not found. Please restart the app and select your role.';
+      }
+
+      // Create connection request
+      await FirestoreService.createConnectionRequest(userDocId);
+
+      // Try to find and connect with a waiting partner
+      final partner = await FirestoreService.findAndConnectPartner(userDocId);
+
+      if (partner != null) {
+        // Connection successful!
+        setState(() {
+          _isConnected = true;
+          _statusMessage = '💕 Connected! Your love story begins now...';
+        });
+
+        // Wait a moment to show success, then go back
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          Navigator.of(context).pop(true); // Return true to indicate success
+        }
+      } else {
+        // Still waiting - listen for partner
+        _listenForPartner(userDocId);
+      }
+    } catch (e) {
+      setState(() {
+        _isWaiting = false;
+        _statusMessage = 'Press the magic button to connect with your love';
+      });
+      _showError('Connection failed: $e');
+    }
   }
 
-  void _onButtonPressEnd() {
-    setState(() {
-      _isPressed = false;
+  void _listenForPartner(String userId) {
+    FirestoreService.watchConnectionRequest(userId).listen((snapshot) {
+      if (snapshot.exists && mounted) {
+        final data = snapshot.data() as Map<String, dynamic>?;
+        final status = data?['status'] as String?;
+
+        if (status == 'connected') {
+          setState(() {
+            _isConnected = true;
+            _statusMessage = '💕 Connected! Your love story begins now...';
+          });
+
+          // Wait a moment to show success, then go back
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.of(context).pop(true);
+            }
+          });
+        }
+      }
     });
-    _scaleController.reverse();
-    _textController.reverse();
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppConstants.heartRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Future<void> _cancelConnection() async {
+    try {
+      final userDocId = await UserService.getUserDocId();
+      if (userDocId != null) {
+        await FirestoreService.cancelConnectionRequest(userDocId);
+      }
+      setState(() {
+        _isWaiting = false;
+        _statusMessage = 'Press the magic button to connect with your love';
+      });
+    } catch (e) {
+      debugPrint('Error canceling connection: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: AppConstants.pinkGradient,
+        decoration: const BoxDecoration(
+          gradient: AppConstants.purpleGradient,
         ),
         child: Stack(
           children: [
+            // Animated particles background
+            AnimatedBuilder(
+              animation: _particleController,
+              builder: (context, child) {
+                return CustomPaint(
+                  painter: MagicParticlesPainter(_particleController.value),
+                  size: MediaQuery.of(context).size,
+                );
+              },
+            ),
+
+            // Main content
             SafeArea(
               child: Column(
                 children: [
-                  _buildAppBar(),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        Center(
-                          child: _isConnected
-                              ? _buildConnectionButton()
-                              : _buildConnectPrompt(),
+                  // Back button
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.all(AppConstants.defaultPadding),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () async {
+                          if (_isWaiting) {
+                            await _cancelConnection();
+                          }
+                          if (mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // Title
+                  Text(
+                    'Connect With Love',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.2),
+                          offset: const Offset(0, 2),
+                          blurRadius: 4,
                         ),
-                        const LockButton(),
                       ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Magic button
+                  AnimatedBuilder(
+                    animation: _scaleAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _isWaiting ? _scaleAnimation.value : 1.0,
+                        child: GestureDetector(
+                          onTap: _onMagicButtonPressed,
+                          child: AnimatedBuilder(
+                            animation: _rotateController,
+                            builder: (context, child) {
+                              return Transform.rotate(
+                                angle: _isWaiting
+                                    ? _rotateController.value * 2 * pi
+                                    : 0,
+                                child: Container(
+                                  width: 200,
+                                  height: 200,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: _isConnected
+                                          ? [
+                                              Colors.green.shade300,
+                                              Colors.green.shade500,
+                                            ]
+                                          : _isWaiting
+                                              ? [
+                                                  AppConstants.accentRose,
+                                                  AppConstants.heartRed,
+                                                ]
+                                              : [
+                                                  Colors.white,
+                                                  AppConstants.primaryPink,
+                                                ],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: _isWaiting
+                                            ? AppConstants.heartRed
+                                                .withOpacity(0.6)
+                                            : Colors.white.withOpacity(0.5),
+                                        blurRadius: 30,
+                                        spreadRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      _isConnected
+                                          ? Icons.check
+                                          : _isWaiting
+                                              ? Icons.favorite
+                                              : Icons.touch_app,
+                                      size: 80,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Status message
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      _statusMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withOpacity(0.2),
+                            offset: const Offset(0, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  if (_isWaiting && !_isConnected) ...[
+                    const SizedBox(height: 24),
+                    TextButton(
+                      onPressed: () async {
+                        await _cancelConnection();
+                      },
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  const Spacer(),
+
+                  // Instructions
+                  Container(
+                    margin: const EdgeInsets.all(AppConstants.largePadding),
+                    padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius:
+                          BorderRadius.circular(AppConstants.borderRadius),
+                    ),
+                    child: const Text(
+                      'Both of you need to press the magic button at the same time (or one after another) to create your connection! ✨',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ],
@@ -145,311 +358,75 @@ class _ConnectionScreenState extends State<ConnectionScreen>
       ),
     );
   }
+}
 
-  Widget _buildAppBar() {
-    return Padding(
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const Text(
-            'Connection',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
+class MagicParticlesPainter extends CustomPainter {
+  final double animationValue;
+  final Random random = Random(123);
+
+  MagicParticlesPainter(this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    // Create floating hearts and stars
+    for (int i = 0; i < 30; i++) {
+      final x = random.nextDouble() * size.width;
+      final baseY = random.nextDouble() * size.height;
+      final y = (baseY + (animationValue * 150 + i * 10)) % size.height;
+      final opacity = (sin(animationValue * 2 * pi + i) + 1) / 2;
+
+      paint.color = Colors.white.withOpacity(opacity * 0.4);
+
+      if (i % 2 == 0) {
+        // Draw heart
+        _drawHeart(canvas, paint, Offset(x, y), 8);
+      } else {
+        // Draw star
+        _drawStar(canvas, paint, Offset(x, y), 10);
+      }
+    }
   }
 
-  Widget _buildConnectionButton() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Instruction text
-        const Text(
-          'Press & Hold',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 40),
-
-        // Big round button
-        GestureDetector(
-          onTapDown: (_) => _onButtonPressStart(),
-          onTapUp: (_) => _onButtonPressEnd(),
-          onTapCancel: _onButtonPressEnd,
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_pulseAnimation, _scaleAnimation]),
-            builder: (context, child) {
-              return Transform.scale(
-                scale:
-                    _isPressed ? _scaleAnimation.value : _pulseAnimation.value,
-                child: Container(
-                  width: 250,
-                  height: 250,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: _isPressed
-                          ? [
-                              AppConstants.heartRed,
-                              AppConstants.accentRose,
-                            ]
-                          : [
-                              AppConstants.primaryPink,
-                              AppConstants.secondaryPurple,
-                            ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppConstants.heartRed.withOpacity(0.4),
-                        blurRadius: 30,
-                        spreadRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: _isPressed
-                        ? FadeTransition(
-                            opacity: _textOpacityAnimation,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  _partnerName ?? 'My Love',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  '💕',
-                                  style: TextStyle(fontSize: 40),
-                                ),
-                                const SizedBox(height: 8),
-                                StreamBuilder<DocumentSnapshot>(
-                                  stream: _partnerId != null
-                                      ? FirebaseFirestore.instance
-                                          .collection('users')
-                                          .doc(_partnerId)
-                                          .snapshots()
-                                      : null,
-                                  builder: (context, snapshot) {
-                                    if (snapshot.hasData) {
-                                      final data = snapshot.data?.data()
-                                          as Map<String, dynamic>?;
-                                      final isOnline =
-                                          data?['isOnline'] as bool? ?? false;
-                                      return Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 12,
-                                            height: 12,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: isOnline
-                                                  ? Colors.greenAccent
-                                                  : Colors.grey,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            isOnline ? 'Online' : 'Offline',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }
-                                    return const SizedBox.shrink();
-                                  },
-                                ),
-                              ],
-                            ),
-                          )
-                        : const Icon(
-                            Icons.favorite,
-                            size: 80,
-                            color: Colors.white,
-                          ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-
-        const SizedBox(height: 40),
-
-        // Status text
-        if (!_isPressed)
-          const Text(
-            'to see your connection',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-            ),
-          ),
-      ],
+  void _drawHeart(Canvas canvas, Paint paint, Offset center, double size) {
+    final path = Path();
+    path.moveTo(center.dx, center.dy + size / 4);
+    path.cubicTo(
+      center.dx - size / 2,
+      center.dy - size / 4,
+      center.dx - size,
+      center.dy + size / 4,
+      center.dx,
+      center.dy + size,
     );
+    path.cubicTo(
+      center.dx + size,
+      center.dy + size / 4,
+      center.dx + size / 2,
+      center.dy - size / 4,
+      center.dx,
+      center.dy + size / 4,
+    );
+    canvas.drawPath(path, paint);
   }
 
-  Widget _buildConnectPrompt() {
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(40),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppConstants.shadowColor,
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                const Icon(
-                  Icons.link_off,
-                  size: 80,
-                  color: AppConstants.primaryPink,
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Not Connected Yet',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppConstants.textDark,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Connect with your partner to see the magic happen!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppConstants.textDark.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton.icon(
-                  onPressed: _showConnectPartnerDialog,
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Connect Partner'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primaryPink,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  void _drawStar(Canvas canvas, Paint paint, Offset center, double size) {
+    final path = Path();
+    for (int i = 0; i < 5; i++) {
+      final angle = (i * 4 * pi / 5) - pi / 2;
+      final x = center.dx + size * cos(angle);
+      final y = center.dy + size * sin(angle);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
   }
 
-  void _showConnectPartnerDialog() {
-    final emailController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Connect with Partner 💕'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Enter your partner\'s email to connect:'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Partner Email',
-                hintText: 'love@example.com',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (emailController.text.trim().isNotEmpty) {
-                try {
-                  final currentUser = AuthService.currentUser;
-                  if (currentUser != null) {
-                    await FirestoreService.connectPartner(
-                      currentUser.uid,
-                      emailController.text.trim(),
-                    );
-                    if (mounted) {
-                      Navigator.pop(context);
-                      await _loadPartnerInfo(); // Reload partner info
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Connected with partner! 💖'),
-                          backgroundColor: AppConstants.primaryPink,
-                        ),
-                      );
-                    }
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: $e'),
-                        backgroundColor: AppConstants.heartRed,
-                      ),
-                    );
-                  }
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryPink,
-            ),
-            child: const Text('Connect'),
-          ),
-        ],
-      ),
-    );
-  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

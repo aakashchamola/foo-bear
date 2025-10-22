@@ -11,6 +11,7 @@ class AppConstants {
   static const String photosCollection = 'photos';
   static const String diaryCollection = 'diary';
   static const String notificationsCollection = 'notifications';
+  static const String connectionsCollection = 'connections';
 
   // Colors - Romantic Theme
   static const Color primaryPink = Color(0xFFFFB6C1); // Light Pink
@@ -112,6 +113,7 @@ class AppConstants {
   static const String secretPasscodeKey = 'secret_passcode';
   static const String themeKey = 'current_theme';
   static const String soundEnabledKey = 'sound_enabled';
+  static const String userRoleKey = 'user_role'; // 'male' or 'female'
 
   // File Paths
   static const String profileImagePath = 'profile_images/';

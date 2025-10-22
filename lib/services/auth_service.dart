@@ -12,6 +12,29 @@ class AuthService {
   // Auth state changes stream
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  // Sign in anonymously (auto-login without credentials)
+  static Future<UserCredential> signInAnonymously() async {
+    try {
+      return await _auth.signInAnonymously();
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw 'An unexpected error occurred: $e';
+    }
+  }
+
+  // Check and ensure user is authenticated (auto sign-in if not)
+  static Future<User> ensureAuthenticated() async {
+    // If already signed in, return current user
+    if (currentUser != null) {
+      return currentUser!;
+    }
+
+    // Otherwise, sign in anonymously
+    final userCredential = await signInAnonymously();
+    return userCredential.user!;
+  }
+
   // Sign in with email and password
   static Future<UserCredential?> signInWithEmailAndPassword({
     required String email,

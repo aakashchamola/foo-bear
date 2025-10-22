@@ -2,6 +2,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
+import '../services/auth_service.dart';
+import '../services/firestore_service.dart';
+import '../services/user_service.dart';
 import 'home_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -104,6 +107,201 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _buttonController.dispose();
     _gradientController.dispose();
     super.dispose();
+  }
+
+  Widget _buildRoleButton({
+    required String role,
+    required String emoji,
+    required String label,
+    required Gradient gradient,
+  }) {
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: gradient,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => _selectRole(role),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                emoji,
+                style: const TextStyle(fontSize: 48),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 22,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectRole(String role) async {
+    try {
+      // Get current authenticated user
+      final user = await AuthService.ensureAuthenticated();
+
+      // Find or create user document based on role (links to existing docs with 'gender' field)
+      final userDocId =
+          await FirestoreService.findOrCreateUserByRole(user.uid, role);
+
+      // Save the actual document ID using UserService and SharedPreferences
+      await UserService.setUserDocId(userDocId);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userRoleKey, role);
+      await prefs.setBool('welcome_completed', true);
+
+      if (!mounted) return;
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            role == 'male' ? '💙 Welcome, King!' : '💖 Welcome, Queen!',
+          ),
+          backgroundColor:
+              role == 'male' ? Colors.blue : AppConstants.accentRose,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+
+      // Navigate to home screen with animation
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const HomeScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(
+                  begin: 0.8,
+                  end: 1.0,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOut,
+                )),
+                child: child,
+              ),
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 800),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        // Check if it's a Firestore permission error
+        final errorMessage = e.toString().toLowerCase();
+        if (errorMessage.contains('firestore') ||
+            errorMessage.contains('permission') ||
+            errorMessage.contains('not been used') ||
+            errorMessage.contains('disabled')) {
+          _showFirestoreErrorDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: AppConstants.heartRed,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _showFirestoreErrorDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cloud_off, color: AppConstants.heartRed),
+            SizedBox(width: 8),
+            Expanded(child: Text('Firestore Not Enabled')),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Cloud Firestore is not enabled in your Firebase project.\n',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const Text(
+                'Quick Fix:\n',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const Text(
+                '1. Go to Firebase Console\n'
+                '2. Select your project\n'
+                '3. Click "Firestore Database"\n'
+                '4. Click "Create database"\n'
+                '5. Choose "Start in test mode"\n'
+                '6. Select a location\n'
+                '7. Click "Enable"\n'
+                '8. Restart this app\n',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Or click the link in the error message above to enable Firestore directly.',
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('OK, I\'ll Enable It'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -241,99 +439,66 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             },
                           ),
 
-                          const SizedBox(height: 80),
+                          const SizedBox(height: 60),
 
-                          // Begin Button
+                          // Role Selection Text
                           AnimatedBuilder(
                             animation: _buttonSlideAnimation,
                             builder: (context, child) {
                               return Transform.translate(
                                 offset: Offset(0, _buttonSlideAnimation.value),
-                                child: Container(
-                                  width: double.infinity,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(30),
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        AppConstants.secondaryPurple,
-                                        AppConstants.accentRose,
-                                      ],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppConstants.secondaryPurple
-                                            .withOpacity(0.4),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 8),
-                                      ),
-                                    ],
+                                child: const Text(
+                                  'I am...',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: AppConstants.textDark,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(30),
-                                      onTap: () async {
-                                        // Mark welcome as completed
-                                        final prefs = await SharedPreferences
-                                            .getInstance();
-                                        await prefs.setBool(
-                                            'welcome_completed', true);
+                                ),
+                              );
+                            },
+                          ),
 
-                                        if (!mounted) return;
+                          const SizedBox(height: 24),
 
-                                        // Navigate to home screen
-                                        Navigator.of(context).pushReplacement(
-                                          PageRouteBuilder(
-                                            pageBuilder: (context, animation,
-                                                    secondaryAnimation) =>
-                                                const HomeScreen(),
-                                            transitionsBuilder: (context,
-                                                animation,
-                                                secondaryAnimation,
-                                                child) {
-                                              return FadeTransition(
-                                                opacity: animation,
-                                                child: ScaleTransition(
-                                                  scale: Tween<double>(
-                                                    begin: 0.8,
-                                                    end: 1.0,
-                                                  ).animate(CurvedAnimation(
-                                                    parent: animation,
-                                                    curve: Curves.easeOut,
-                                                  )),
-                                                  child: child,
-                                                ),
-                                              );
-                                            },
-                                            transitionDuration: const Duration(
-                                                milliseconds: 800),
-                                          ),
-                                        );
-                                      },
-                                      child: Center(
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'Begin',
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            const Icon(
-                                              Icons.arrow_forward,
-                                              color: Colors.white,
-                                              size: 24,
-                                            ),
+                          // Role Selection Buttons
+                          AnimatedBuilder(
+                            animation: _buttonSlideAnimation,
+                            builder: (context, child) {
+                              return Transform.translate(
+                                offset: Offset(0, _buttonSlideAnimation.value),
+                                child: Row(
+                                  children: [
+                                    // Male Button
+                                    Expanded(
+                                      child: _buildRoleButton(
+                                        role: 'male',
+                                        emoji: '👨',
+                                        label: 'Him',
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.blue.shade300,
+                                            Colors.blue.shade500,
                                           ],
                                         ),
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(width: 16),
+                                    // Female Button
+                                    Expanded(
+                                      child: _buildRoleButton(
+                                        role: 'female',
+                                        emoji: '👩',
+                                        label: 'Her',
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            AppConstants.primaryPink,
+                                            AppConstants.accentRose,
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             },

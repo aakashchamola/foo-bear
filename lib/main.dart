@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:her/firebase_options.dart';
 import 'utils/constants.dart';
 import 'services/remote_config_service.dart';
+import 'services/auth_service.dart';
+import 'services/firestore_service.dart';
 import 'screens/camouflage/fake_todo_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/chat_screen.dart';
@@ -11,13 +13,22 @@ import 'screens/chat_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    // Initialize Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
-  // Initialize Remote Config
-  await RemoteConfigService().initialize();
+    // Initialize Remote Config
+    await RemoteConfigService().initialize();
+
+    // Auto-authenticate user anonymously
+    // Note: Anonymous Authentication must be enabled in Firebase Console
+    await AuthService.ensureAuthenticated();
+  } catch (e) {
+    debugPrint('❌ Initialization error: $e');
+    // Continue anyway - we'll handle it in the app
+  }
 
   runApp(const UsTimeApp());
 }
@@ -56,12 +67,85 @@ class _AppWrapperState extends State<AppWrapper> {
   }
 
   Future<void> _initialize() async {
-    // Short delay for splash effect
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      // Ensure user is authenticated (with retry)
+      User? user;
+      try {
+        user = await AuthService.ensureAuthenticated();
+      } catch (authError) {
+        debugPrint('❌ Auth error: $authError');
+        // Show error to user
+        if (mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showAuthErrorDialog();
+            }
+          });
+        }
+        // Still set loading to false to show the error screen
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
 
-    setState(() {
-      _isLoading = false;
-    });
+      // Try to find user profile by auth UID (handles manual documents)
+      final userDoc = await FirestoreService.getUserProfileByAuthUid(user.uid);
+
+      if (userDoc == null || !userDoc.exists) {
+        // No profile found - user will select role in welcome screen
+        debugPrint('No user profile found, will create on role selection');
+      } else {
+        debugPrint('Found existing user profile: ${userDoc.id}');
+      }
+
+      // Short delay for splash effect
+      await Future.delayed(const Duration(milliseconds: 500));
+    } catch (e) {
+      debugPrint('❌ Initialization error: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showAuthErrorDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: AppConstants.heartRed),
+            SizedBox(width: 8),
+            Text('Setup Required'),
+          ],
+        ),
+        content: const Text(
+          'Firebase Anonymous Authentication is not enabled.\n\n'
+          'Please enable it in Firebase Console:\n'
+          '1. Go to Firebase Console\n'
+          '2. Select your project\n'
+          '3. Go to Authentication > Sign-in method\n'
+          '4. Enable "Anonymous" provider\n'
+          '5. Restart the app',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

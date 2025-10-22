@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/user_service.dart';
 import '../utils/constants.dart';
 import '../widgets/lock_button.dart';
 
@@ -27,12 +28,15 @@ class _ChatScreenState extends State<ChatScreen> {
     final currentUser = AuthService.currentUser;
     if (currentUser != null) {
       try {
-        final userDoc = await FirestoreService.getUserProfile(currentUser.uid);
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>?;
-          setState(() {
-            _partnerId = userData?['partnerId'] as String?;
-          });
+        final userDocId = await UserService.getUserDocId();
+        if (userDocId != null) {
+          final userDoc = await FirestoreService.getUserProfile(userDocId);
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>?;
+            setState(() {
+              _partnerId = userData?['partnerId'] as String?;
+            });
+          }
         }
       } catch (e) {
         debugPrint('Error loading partner info: $e');

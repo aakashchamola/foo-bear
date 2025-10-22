@@ -88,12 +88,17 @@ class _FakeTodoScreenState extends State<FakeTodoScreen>
 
     final prefs = await SharedPreferences.getInstance();
     final welcomeCompleted = prefs.getBool('welcome_completed') ?? false;
+    final userRole = prefs.getString('user_role'); // Check if role is set
+
+    // If role is not set, show welcome screen regardless of welcome_completed
+    final hasCompletedSetup =
+        welcomeCompleted && (userRole != null && userRole.isNotEmpty);
 
     // Navigate to appropriate screen
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            welcomeCompleted ? const HomeScreen() : const WelcomeScreen(),
+            hasCompletedSetup ? const HomeScreen() : const WelcomeScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
             opacity: animation,

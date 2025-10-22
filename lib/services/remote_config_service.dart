@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 class RemoteConfigService {
@@ -10,10 +11,28 @@ class RemoteConfigService {
 
   // Remote Config Keys
   static const String _secretPasswordKey = 'secretPassShriya';
+  static const String _maleUserDataKey = 'male_user_data';
+  static const String _femaleUserDataKey = 'female_user_data';
 
   // Default values
-  static const Map<String, dynamic> _defaults = {
+  static final Map<String, dynamic> _defaults = {
     _secretPasswordKey: 'kaku',
+    _maleUserDataKey: jsonEncode({
+      'name': 'Him',
+      'nickname': 'King',
+      'email': 'him@ustime.app',
+      'displayName': 'My King',
+      'photoUrl': '',
+      'gender': 'male',
+    }),
+    _femaleUserDataKey: jsonEncode({
+      'name': 'Her',
+      'nickname': 'Queen',
+      'email': 'her@ustime.app',
+      'displayName': 'My Queen',
+      'photoUrl': '',
+      'gender': 'female',
+    }),
   };
 
   /// Initialize Remote Config
@@ -55,6 +74,35 @@ class RemoteConfigService {
       print('❌ Failed to get secret password: $e');
       return _defaults[_secretPasswordKey] as String;
     }
+  }
+
+  /// Get male user data from Remote Config
+  Map<String, dynamic> getMaleUserData() {
+    try {
+      final jsonString = _remoteConfig.getString(_maleUserDataKey);
+      return jsonDecode(jsonString) as Map<String, dynamic>;
+    } catch (e) {
+      print('❌ Failed to get male user data: $e - using defaults');
+      return jsonDecode(_defaults[_maleUserDataKey] as String)
+          as Map<String, dynamic>;
+    }
+  }
+
+  /// Get female user data from Remote Config
+  Map<String, dynamic> getFemaleUserData() {
+    try {
+      final jsonString = _remoteConfig.getString(_femaleUserDataKey);
+      return jsonDecode(jsonString) as Map<String, dynamic>;
+    } catch (e) {
+      print('❌ Failed to get female user data: $e - using defaults');
+      return jsonDecode(_defaults[_femaleUserDataKey] as String)
+          as Map<String, dynamic>;
+    }
+  }
+
+  /// Get user data by role ('male' or 'female')
+  Map<String, dynamic> getUserDataByRole(String role) {
+    return role == 'male' ? getMaleUserData() : getFemaleUserData();
   }
 
   /// Force fetch latest config (call when you want to refresh)
